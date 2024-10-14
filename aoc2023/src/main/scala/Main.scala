@@ -42,7 +42,6 @@ def solve1Part2(inputFilePath: String): Long =
     "8" -> '8',
     "9" -> '9'
   )
-
   Files
     .readAllLines(Path.of(inputFilePath))
     .asScala
@@ -229,8 +228,6 @@ def solve3Part1(inputFilePath: String): Long =
       }
     }
   })
-  println(s"Number of valid numbers is ${validNumbers.size}")
-  validNumbers.foreach(println)
   validNumbers.foldRight(0)((entity, acc) => entity.value + acc)
 
 def solve3Part2(inputFilePath: String): Long =
@@ -244,6 +241,78 @@ def solve3Part2(inputFilePath: String): Long =
     .map(numbers => numbers.map(_.value).foldRight(1)(_ * _))
     .sum()
 
+def getWinningAndMyNumbers(str: String) = {
+  val parts = str
+    .split(':')
+    .drop(1)
+    .head
+    .split('|')
+  def processCars = (str: String) => {
+    str.trim
+      .split("\\s+")
+      .map(_.trim)
+      .map(_.toLong)
+      .toList
+  }
+  (processCars(parts.take(1).head), processCars(parts.drop(1).head))
+}
+def getCardNumberAndWinningAndMyNumbers(
+    str: String
+) = {
+  val parts = str
+    .split(':')
+    .drop(1)
+    .head
+    .split('|')
+  def processCars = (str: String) => {
+    str.trim
+      .split("\\s+")
+      .map(_.trim)
+      .map(_.toLong)
+      .toList
+  }
+  val cardNumber = str
+    .split(':')
+    .head
+    .replace("Card ", "")
+    .trim
+    .toInt
+  (
+    cardNumber,
+    processCars(parts.take(1).head),
+    processCars(parts.drop(1).head)
+  )
+}
+def solve4Part1(inputFilePath: String): Long = {
+  val lines = Files.readAllLines(Path.of(inputFilePath)).asScala.toList
+  lines
+    .map(line => {
+      val (winning, my) = getWinningAndMyNumbers(line)
+      val contained = my.filter(winning.contains(_)).size
+      if contained == 0 then 0
+      else 1 << contained - 1
+    })
+    .sum
+}
+
+def solve4Part2(inputFilePath: String): Long = {
+  val lines = Files.readAllLines(Path.of(inputFilePath)).asScala.toList
+  val map = (1 to lines.size).map(i => (i, 1)).toMap
+  val map2 = lines
+    .foldLeft(map)((acc, line) => {
+      val (cardNumber, winning, my) = getCardNumberAndWinningAndMyNumbers(line)
+      val n = my.filter(winning.contains(_)).size 
+      val entries =
+        for (i <- cardNumber + 1 to cardNumber + n)
+          yield (i, acc.getOrElse(i, 0) + acc.get(cardNumber).get)
+       acc ++ entries
+    })
+  map2
+    .values
+    .sum
+}
+
 @main def hello(args: String*): Unit =
-  assert(solve1Part2("./inputs/day1_input.txt") == 281, "example failed!")
-  println(solve1Part2("./inputs/day1_input2.txt"))
+  val out1 = solve4Part2("./inputs/day4_input.txt")
+  assert(out1 == 30, s"example failed! wanted 30 but got $out1")
+  println(solve4Part2("./inputs/day4_input2.txt"))
