@@ -1,9 +1,12 @@
 import scala.collection.JavaConverters._
-import java.nio.file.Files
+
 import java.nio.file.Path
-import scala.collection.Searching.Found
-import scala.collection.Searching.InsertionPoint
 import java.util.regex.Pattern
+
+import scala.collection.Searching.InsertionPoint
+
+import scala.collection.mutable
+import java.nio.file.Files
 
 def solve1Part1(inputFilePath: String): Long =
   Files
@@ -301,18 +304,194 @@ def solve4Part2(inputFilePath: String): Long = {
   val map2 = lines
     .foldLeft(map)((acc, line) => {
       val (cardNumber, winning, my) = getCardNumberAndWinningAndMyNumbers(line)
-      val n = my.filter(winning.contains(_)).size 
+      val n = my.filter(winning.contains(_)).size
       val entries =
         for (i <- cardNumber + 1 to cardNumber + n)
           yield (i, acc.getOrElse(i, 0) + acc.get(cardNumber).get)
-       acc ++ entries
+      acc ++ entries
     })
-  map2
-    .values
-    .sum
+  map2.values.sum
 }
 
-@main def hello(args: String*): Unit =
-  val out1 = solve4Part2("./inputs/day4_input.txt")
-  assert(out1 == 30, s"example failed! wanted 30 but got $out1")
-  println(solve4Part2("./inputs/day4_input2.txt"))
+def applyFns(fns: Array[(Long) => Long], a: Long) = {
+  var ans = a
+  for (fn <- fns) do ans = fn(ans)
+  ans
+}
+
+def getFn(lines: Seq[String]): Long => Long =
+  var fns: Array[(Long) => Long] = lines
+    .drop(2)
+    .mkString("\n")
+    .split("\n\n")
+    .map(chunk => {
+      val intervalsMapping = chunk
+        .split('\n')
+        .drop(1)
+        .foldLeft(Set[(Long, Long, Long)]())((acc, line) => {
+          // <destination range start> <source range start> <range length>
+          val l = line.split(' ').map(_.toLong)
+          acc + ((l(0), l(1), l(2)))
+        });
+      def a(num: Long): Long = {
+        intervalsMapping
+          .find((t) => {
+            val (_, sourceStart, rangeLen) = t;
+            num >= sourceStart && num <= sourceStart + rangeLen
+          })
+          .map(t => {
+            val (destinationStart, sourceStart, _) = t;
+            destinationStart + (num - sourceStart)
+          })
+          .getOrElse(num)
+      }
+      a
+    })
+  applyFns(fns, _)
+
+def solve5Seeds(
+    seeds: List[Long],
+    f: Long => Long
+): Long = {
+  seeds.zip(seeds.map(f)).minBy(_._2)._2
+}
+def solve5Part1(inputFilePath: String): Long = {
+  val lines = Files.readAllLines(Path.of(inputFilePath)).asScala.toList
+  val seeds =
+    lines.head.split(':').tail.head.split(' ').filter(_.nonEmpty).map(_.toLong)
+  solve5Seeds(seeds.toList, getFn(lines))
+}
+
+
+def max(a: Long, b: Long) = if a > b then a else b
+def min(a: Long, b: Long) = if a < b then a else b
+
+/** Hello
+ */
+final case class Func5i(val b: Long, val a: Long, val l: Long) extends Ordered[Func5i]:
+  val srcStart =  a;
+  // Exclusive
+  val srcEnd = a + l
+  val destineStart = b;
+  val destineEnd = b + l
+
+  import scala.math.Ordered.orderingToOrdered
+
+  def apply(x: Long) =
+    val result = b + (x - a)
+    assert(result < destineEnd, s"invalid apply on $x not belonging to [$srcStart, $srcEnd)")
+    assert(result >= destineStart, s"invalid apply on $x not belonging to [$srcStart, $srcEnd)")
+    result
+
+  def accepts(x: Long) =
+    x >= srcStart && x < srcEnd
+
+  def accepts(x: (Long, Long)): Option[(Long, Long)] =
+    val (s, e) = if x._1 <= x._2 then x else x.swap
+    if e < srcStart || s >= srcEnd then None
+    else Some(max(srcStart, s), min(srcEnd, e))
+
+  def compare(that: Func5i): Int = {
+    tuple.compare(that.tuple)
+  }
+  def tuple: (Long, Long, Long) = {
+    (srcStart, destineStart, l)
+  }
+  override def toString = s"[$srcStart, $srcEnd) -> [$destineStart, $destineEnd)"
+
+
+case class Func5(val funcs: Set[Func5i]):
+  def apply(x: Int): Long =
+    funcs.find(f => f.accepts(x)).map(f => f(x)).getOrElse(x)
+
+  def apply(x: (Long, Long)): Set[(Long, Long)] =
+    var i = 0
+    var result = mutable.Set[(Long, Long)]()
+    var (s, e) = if x._1 > x._2 then x.swap else x
+    val intervalLen = e - s;
+    var cur = s
+    funcs.toList.sorted.foreach(func => {
+      if s < e then func.accepts((s, e)) match {
+        case Some((ss, ee)) => {
+          if ss != s then
+            result += (s, ss)
+          result += (func(ss), func(ee-1)+1)
+          s = ee
+        }
+        case None => {}
+      }
+    })
+
+    if s < e then result += (s, e)
+
+    assert(result.foldLeft(0L)((cur, v) => cur + (v._2 - v._1)) <= intervalLen, s"Problem detected input interval ${x} < output sum of intervals ${result}")
+
+    Set.from(result)
+
+  def apply(xs: Set[(Long, Long)]): Set[(Long, Long)] = 
+    xs.toList.sorted.foldLeft(Set[(Long, Long)]())((acc, v) => {
+      val n = apply(v)
+      acc ++ n
+    })
+
+ 
+
+object Func5:
+  def fromChunk(chunk: String) =
+    Func5(chunk.split('\n').drop(1).map(fline => {
+            val nums = fline.split(" ").map(_.toLong)
+            Func5i(nums(0), nums(1), nums(2))
+          }).sorted.toSet)
+
+
+def intervalsSumLength(intervals: Set[(Long, Long)]): Long =
+  intervals.foldLeft(0L)((cur, interval) => cur + (interval._2 - interval._1))
+
+def locations(intervals: Set[(Long, Long)], fs: List[Func5]): Set[(Long, Long)] =
+  var currentIntervalSumLength = intervalsSumLength(intervals)
+  fs.foldLeft(intervals.toList.sorted.toSet)((cur, f) => {
+    var newIntervalLength = intervalsSumLength(f(cur))
+    assert (currentIntervalSumLength == newIntervalLength, s"$f FAILED! Intervals change length $cur ($currentIntervalSumLength) ${f(cur)} (${newIntervalLength})")
+    f(cur)
+  })
+
+def solve5Hard(intervals: Set[(Long, Long)], fs: List[Func5]): Long = {
+  val ls = locations(intervals, fs)
+  if ls.nonEmpty then ls.toList.sorted.head._1
+  else -1L
+}
+
+def seedsAndFuncs(inputFilePath: String) =
+  val lines = Files.readAllLines(Path.of(inputFilePath))
+    .asScala
+    .toList
+  val seeds = lines
+    .head
+    .split(':')(1)
+    .trim
+    .split(' ')
+    .map(_.toLong)
+  val seedIntervals: Set[(Long, Long)] = seeds.slice(0, seeds.size-1)
+    .zip(seeds.slice(1, seeds.size))
+    .zipWithIndex
+    .filter((pair, index) => index % 2 == 0)
+    .map(_._1)
+    .map(t => (t(0), t(0) + t(1)))
+    .toSet
+  val funcs: List[Func5] = lines.drop(2)
+    .mkString("\n")
+    .split("\n\n")
+    .map(Func5.fromChunk)
+    .toList
+  (seedIntervals, funcs)
+
+def solve5Part2(inputFilePath: String): Long =
+  val (seeds, funcs) = seedsAndFuncs(inputFilePath)
+  solve5Hard(seeds, funcs)
+
+@main
+def main(): Unit =
+  val out1 = solve5Part2("./inputs/day5_input.txt")
+  assert(out1 == 46, s"example failed! wanted 46 but got $out1")
+  println(solve5Part2("./inputs/day5_input2.txt"))
+  

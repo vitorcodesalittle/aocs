@@ -8,9 +8,8 @@ lazy val root = project
 
     scalaVersion := scala3Version,
 
-    libraryDependencies ++= Seq("org.scalameta" %% "munit" % "1.0.0" % Test,
-    "com.softwaremill.sttp.client4" %% "core" % "4.0.0-M6",
+    libraryDependencies ++= Seq(
     "org.scala-lang" %% "toolkit" % "0.1.7",
+    "org.scalameta" %% "munit" % "1.0.0-M7" % Test
     )
-    
   )
