@@ -34,4 +34,4 @@ metals.sbt
 .scala-build
 
 
-input*.txt
+inputs/
