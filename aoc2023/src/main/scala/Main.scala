@@ -489,9 +489,72 @@ def solve5Part2(inputFilePath: String): Long =
   val (seeds, funcs) = seedsAndFuncs(inputFilePath)
   solve5Hard(seeds, funcs)
 
+final case class RaceRecord(val time: Long, val distance: Long)
+
+object RaceRecord:
+  def hold(ms: Long, maxMs: Long) = RaceRecord(
+      time = maxMs,
+      distance = max(maxMs - ms, 0L) * ms 
+    )
+
+
+def solve6(input: List[RaceRecord]): Int =
+  def countWaysToBeat(raceRecord: RaceRecord): Int =
+    (1L until raceRecord.time)
+      .map(ms => {
+      RaceRecord.hold(ms, raceRecord.time)
+    }).count(myRace => myRace.distance > raceRecord.distance)
+  input.map(countWaysToBeat).foldLeft(1)((acc, cur) => acc * cur)
+
+def parse6Input1(path: String): List[RaceRecord] =
+  def parseNumbers(line: String) =
+    println(line)
+    line.split(':')
+    .drop(1)
+    .head
+    .trim
+    .split(" +")
+    .map(_.toLong)
+  val lines  = Files.readAllLines(Path.of(path)).asScala
+  parseNumbers(lines(0))
+  .zip(parseNumbers(lines(1)))
+  .map(p => RaceRecord(p._1, p._2))
+  .toList
+
+
+def parse6Input2(path: String): RaceRecord =
+  def parseNumbers(line: String) =
+    println(line)
+    line.split(':')
+    .drop(1)
+    .head
+    .trim
+    .split(" +")
+    .mkString
+    .toLong
+  val lines = Files.readAllLines(Path.of(path)).asScala
+  assert (lines.size == 2)
+  val t = parseNumbers(lines(0))
+  val d = parseNumbers(lines(1))
+  RaceRecord(t, d)
+
+def roots(t: Long, d: Long) =
+    val delta = t * t - 4 * d;
+    if delta <= 0 then List()
+    else
+        List(
+            (-t - math.sqrt(delta)) / -2,
+            (-t + math.sqrt(delta)) / -2).sorted
+
+def solve6Fast(t: Long, d:Long) =
+    val rs = roots(t, d)
+    if rs.size < 2 then 0
+    else math.floor(rs(1)).toLong - math.ceil(rs(0)).toLong + 1
 @main
 def main(): Unit =
-  val out1 = solve5Part2("./inputs/day5_input.txt")
-  assert(out1 == 46, s"example failed! wanted 46 but got $out1")
-  println(solve5Part2("./inputs/day5_input2.txt"))
+  val sampleInput = parse6Input2("./inputs/6_sample.txt")
+  val sampleOutput = solve6Fast(sampleInput.time, sampleInput.distance)
+  assert(71503 == sampleOutput, s"example failed! wanted 288 but got $sampleOutput")
+  val singleRecord = parse6Input2("./inputs/6_puzzle.txt")
+  println(solve6Fast(singleRecord.time, singleRecord.distance))
   
