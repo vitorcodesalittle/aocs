@@ -524,7 +524,6 @@ def parse6Input1(path: String): List[RaceRecord] =
 
 def parse6Input2(path: String): RaceRecord =
   def parseNumbers(line: String) =
-    println(line)
     line.split(':')
     .drop(1)
     .head
@@ -550,11 +549,194 @@ def solve6Fast(t: Long, d:Long) =
     val rs = roots(t, d)
     if rs.size < 2 then 0
     else math.floor(rs(1)).toLong - math.ceil(rs(0)).toLong + 1
+
+object CamelPoker {
+  final private case class Hand(private val content: String) extends Ordered[Hand] {
+    val handType: HandType = getHandType(content)
+    def compare(that: Hand) = {
+      val handTypeComparison = handType.compare(that.handType)
+      if handTypeComparison != 0 then handTypeComparison
+      else
+        cardStrengthComparison(content, that.content)
+    }
+  }
+
+  final case class Hand2(private val content: String) extends Ordered[Hand2] {
+    val handType: HandType = getHandType2(content)
+    def compare(that: Hand2) = {
+      val handTypeComparison = handType.compare(that.handType)
+      if handTypeComparison != 0 then handTypeComparison
+      else
+        cardStrengthComparison2(content, that.content)
+    }
+
+    override def toString(): String = 
+      s"Hand2($content, $handType)"
+  }
+
+  private def cardStrengthComparison(a: String, b: String): Int = {
+    if a == b then 0
+    else
+      assert(a.length() == b.length())
+      val (ca, cb) = a.zip(b).find(cs => cs._1 != cs._2).get
+      val (orderA, orderB) = (cardStrenghts(ca), cardStrenghts(cb))
+      orderA - orderB
+  }
+
+  def cardStrengthComparison2(a: String, b: String): Int = {
+    if a == b then 0
+    else
+      assert(a.length() == b.length())
+      val (ca, cb) = a.zip(b).find(cs => cs._1 != cs._2).get
+      val (orderA, orderB) = (cardStrenghts2(ca), cardStrenghts2(cb))
+      orderA - orderB
+  }
+
+  private def countDistincts(content: String): Map[Char, Int] = {
+    content.foldLeft(Map[Char, Int]())((acc, cur) => {
+      if acc.contains(cur) then acc.updated(cur, acc(cur) + 1)
+      else acc.updated(cur, 1)
+    })
+  }
+
+  private def getHandType(content: String): HandType = {
+    val charCounts = countDistincts(content)
+    val counts = charCounts.values.toList
+    if counts.contains(5) then HandType.FiveOfAKind
+    else if counts .contains(4) then HandType.FourOfAKind
+    else if counts.contains(3) && counts.contains(2) then HandType.FullHouse
+    else if counts.contains(3) then HandType.ThreeofAKind
+    else if counts.count(_ == 2) == 2 then HandType.TwoPair
+    else if counts.count(_ == 2) == 1 then HandType.OnePair
+    else HandType.HighCard
+  }
+
+  def getHandType2(content: String): HandType = {
+    val charCounts = countDistincts(content)
+    val jokerCount = charCounts.getOrElse('J', 0)
+    val counts = charCounts.values.toList
+    // 5 of a kind
+    if counts.contains(5) then HandType.FiveOfAKind
+    else if counts.contains(5 - jokerCount) then HandType.FiveOfAKind
+    // 4 of a kind
+    else if counts.contains(4) then HandType.FourOfAKind
+    else if counts.count(_ == 2) == 2 && jokerCount == 2 then HandType.FourOfAKind
+    else if counts.contains(1) && jokerCount == 3 then HandType.FourOfAKind
+    else if counts.contains(3) && jokerCount == 1 then HandType.FourOfAKind
+    // full house
+    else if counts.contains(3) && counts.contains(2) then HandType.FullHouse
+    else if counts.contains(3) &&  counts.contains(2 - jokerCount) then HandType.FullHouse
+    else if counts.count(_ == 2) == 2 && jokerCount >= 1 then HandType.FullHouse
+    // 3 of a kind
+    else if counts.contains(3) then HandType.ThreeofAKind
+    else if counts.contains(2) && jokerCount == 1 then HandType.ThreeofAKind
+    else if jokerCount == 2 then HandType.ThreeofAKind
+    // 2 pairs
+    else if counts.count(_ == 2) == 2 then HandType.TwoPair
+    else if counts.count(_ == 2) == 1 && jokerCount == 1 then HandType.TwoPair
+    // 1 pair
+    else if counts.count(_ == 2) == 1 && jokerCount == 0 then HandType.OnePair
+    else if jokerCount == 1 then HandType.OnePair
+    // high card
+    else HandType.HighCard
+  }
+
+  enum HandType(val order: Int) extends Ordered[HandType] {
+    case FiveOfAKind extends HandType(1)
+    case FourOfAKind extends HandType(2)
+    case FullHouse extends HandType(3)
+    case ThreeofAKind extends HandType(4)
+    case TwoPair extends HandType(5)
+    case OnePair extends HandType(6)
+    case HighCard extends HandType(7)
+    def compare(that: HandType) = {
+      order - that.order
+    }
+  }
+
+  private def cardStrenghts = Map(
+    'A' -> 1,
+    'K' -> 2,
+    'Q' -> 3,
+    'J' -> 4,
+    'T' -> 5,
+    '9' -> 6,
+    '8' -> 7,
+    '7' -> 8,
+    '6' -> 9,
+    '5' -> 10,
+    '4' -> 11,
+    '3' -> 12,
+    '2' -> 13,
+  )
+
+  private def cardStrenghts2 = Map(
+    'A' -> 1,
+    'K' -> 2,
+    'Q' -> 3,
+    'T' -> 5,
+    '9' -> 6,
+    '8' -> 7,
+    '7' -> 8,
+    '6' -> 9,
+    '5' -> 10,
+    '4' -> 11,
+    '3' -> 12,
+    '2' -> 13,
+    'J' -> 14,
+  )
+
+  private def sumRankedBids(handsAndBids: Seq[(Hand, Int)]) = {
+    val sortedHands = handsAndBids.sorted
+    sortedHands
+      .map(_._2) // largest bid first
+      .reverse
+      .zipWithIndex
+      .foldLeft(0)((acc, cur) => acc + (cur._2 + 1) * cur._1)
+  }
+
+  private def sumRankedBids2(handsAndBids: Seq[(Hand2, Int)]) = {
+    val sortedHands = handsAndBids.sorted
+    sortedHands
+      .map(_._2) // largest bid first
+      .reverse
+      .zipWithIndex
+      .foldLeft(0)((acc, cur) => acc + (cur._2 + 1) * cur._1)
+  }
+  private def parseInput(lines: Seq[String]): Seq[(Hand, Int)] = {
+    lines.map(line => {
+      val pieces = line.split(' ')
+      (Hand(pieces(0)), pieces(1).toInt)
+    })
+  }
+  private def parseInput(inputFile: String): Seq[(Hand, Int)] = {
+    parseInput(Files.readAllLines(Path.of(inputFile)).asScala.toList)
+  }
+  private def parseInput2(lines: Seq[String]): Seq[(Hand2, Int)] = {
+    lines.map(line => {
+      val pieces = line.split(' ')
+      (Hand2(pieces(0)), pieces(1).toInt)
+    })
+  }
+  private def parseInput2(inputFile: String): Seq[(Hand2, Int)] = {
+    parseInput2(Files.readAllLines(Path.of(inputFile)).asScala.toList)
+  }
+  def solve(inputFile: String) = sumRankedBids(parseInput(inputFile))
+  def solve2(inputFile: String) = {
+    val input = parseInput2(inputFile)
+    sumRankedBids2(input)
+  }
+}
+
+
 @main
 def main(): Unit =
-  val sampleInput = parse6Input2("./inputs/6_sample.txt")
-  val sampleOutput = solve6Fast(sampleInput.time, sampleInput.distance)
-  assert(71503 == sampleOutput, s"example failed! wanted 288 but got $sampleOutput")
-  val singleRecord = parse6Input2("./inputs/6_puzzle.txt")
-  println(solve6Fast(singleRecord.time, singleRecord.distance))
+  val sampleInput = "./inputs/7_sample.txt"
+  val sampleOutput = CamelPoker.solve2(sampleInput)
+  assert(5905 == sampleOutput, s"example failed! wanted 5905 but got $sampleOutput")
+  val puzzleInput = "./inputs/7_puzzle.txt"
+  val puzzleOutput = CamelPoker.solve2(puzzleInput)
+  assert(249836800 < puzzleOutput, s"$puzzleOutput is too low")
+  assert(250564972 < puzzleOutput, s"$puzzleOutput is too low")
+  println(puzzleOutput)
   
