@@ -729,7 +729,6 @@ object CamelPoker {
 }
 
 
-@main
 def main(): Unit =
   val sampleInput = "./inputs/7_sample.txt"
   val sampleOutput = CamelPoker.solve2(sampleInput)
