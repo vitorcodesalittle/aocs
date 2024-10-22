@@ -15,7 +15,41 @@ object Day7 {
   sealed case class Input(
       path: String,
       tree: Graph
-  )
+  ) {
+    def mapStartEnd: Map[Int, (Int, Option[Int])] =
+      (0 until tree.nodes.size).foldLeft(Map[Int, (Int, Option[Int])]())(
+        (acc, nodeIndex) => {
+          var currentIndex = nodeIndex
+          var zIndex = -1
+          (0 until path.size).foreach(pathIndex => {
+            if path(pathIndex) == 'L' then
+              currentIndex = tree.edges(currentIndex)(0)
+            else currentIndex = tree.edges(currentIndex)(1)
+            if tree.nodes(currentIndex).key == "ZZZ" then zIndex = pathIndex + 1
+          })
+          acc + (nodeIndex -> (currentIndex, if zIndex != -1 then Some(zIndex)
+          else None))
+        }
+      )
+    def mapStartEnd2: Map[Int, (Int, List[Int])] = {
+      (0 until tree.nodes.size).foldLeft(Map[Int, (Int, List[Int])]())(
+        (acc, nodeIndex) => {
+          var currentIndex = nodeIndex
+          val zIndices = (0 until path.size)
+            .map(pathIndex => {
+              if path(pathIndex) == 'L' then
+                currentIndex = tree.edges(currentIndex)(0)
+              else currentIndex = tree.edges(currentIndex)(1)
+              if tree.nodes(currentIndex).key.endsWith("Z") then pathIndex + 1
+              else -1
+            })
+            .toList
+            .filter(_ != -1)
+          acc + (nodeIndex -> (currentIndex, zIndices))
+        }
+      )
+    }
+  }
   def parseInput(pathStr: String): Input = {
     val lines = Files.readAllLines(Path.of(pathStr)).asScala
     val nodes = lines
@@ -50,20 +84,7 @@ object Day7 {
   }
 
   def solve(input: Input): Int = {
-    val mapStartEnd = (0 until input.tree.nodes.size).foldLeft(Map[Int, (Int, Option[Int])]())(
-      (acc, nodeIndex) => {
-        var currentIndex = nodeIndex
-        var zIndex = -1
-        (0 until input.path.size).foreach(pathIndex => {
-          if input.path(pathIndex) == 'L' then
-            currentIndex = input.tree.edges(currentIndex)(0)
-          else currentIndex = input.tree.edges(currentIndex)(1)
-          if input.tree.nodes(currentIndex).key == "ZZZ" then
-            zIndex = pathIndex + 1
-        })
-        acc + (nodeIndex -> (currentIndex, if zIndex != -1 then Some(zIndex) else None))
-      }
-    )
+    val mapStartEnd: Map[Int, (Int, Option[Int])] = input.mapStartEnd
     var walks = 0
     var currentIndex = input.tree.nodes.map(_.key).indexOf("AAA")
     while mapStartEnd(currentIndex)._2 == None do
@@ -71,6 +92,32 @@ object Day7 {
       walks += 1
     end while
     walks * input.path.size + mapStartEnd(currentIndex)._2.get
+  }
+
+  def solve2(input: Input): Int = {
+    val mapStartEnd: Map[Int, (Int, List[Int])] = input.mapStartEnd2
+    var walks = 0
+    var currentIndices =
+      input.tree.nodes.zipWithIndex.filter(_._1.key.endsWith("A")).map(_._2)
+    def done = () => {
+      val positions = currentIndices.map(index => mapStartEnd(index)._2)
+      if positions.size != currentIndices.size then
+        throw new RuntimeException(
+          "positions deve ter sempre tamanho igual currentIndices.size"
+        )
+      positions(0).find((offset) =>
+        positions.drop(1).forall(_.contains(offset))
+      ) match
+        case None        => -1
+        case Some(value) => value
+    }
+    while done() == -1 do
+      currentIndices = currentIndices.map(index => {
+        mapStartEnd(index)._1
+      })
+      walks += 1
+    end while
+    walks * input.path.size + done()
   }
 
   @main
@@ -97,6 +144,17 @@ object Day7 {
 
     println("Starting puzzle")
     println(solve(parseInput("./inputs/8_puzzle.txt")))
+
+    val sampleInput3 = parseInput("./inputs/8_sample3.txt")
+    val gotSample3 = solve2(sampleInput3)
+    val wantSample3 = 6
+    assert(
+      wantSample3 == gotSample3,
+      s"Failed on sample input 3. Wanted $wantSample but got $gotSample"
+    )
+
+    println("Starting puzzle part 2")
+    println(solve2(parseInput("./inputs/8_puzzle.txt")))
   }
 
 }
